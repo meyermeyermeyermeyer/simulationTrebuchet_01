@@ -3,7 +3,7 @@ function simTrajectoire
 
 %% - Données
 k_air = 0.02;                 % coefficient de frottement
-a_air = @(v) -k_air * v;      % frottement
+a_air = @(v) -k_air * v^2;      % frottement
 g = 9.81;
 
 v0 = 30;                      % vitesse initiale
@@ -16,7 +16,7 @@ vy = v0 * sin(theta0);
 
 % Position initiale
 x = 0;
-y = 0;
+y = 2.5;
 
 % Historique pour les graphiques
 X_hist = x;
@@ -27,7 +27,7 @@ T_hist = 0;
 figure('Name','Graphiques','NumberTitle','off');
 
 subplot(2,1,1);
-hTraj = plot(X_hist, Y_hist, 'b', 'LineWidth', 1.5);
+hTraj = plot(X_hist, Y_hist, '--b', 'LineWidth', 1.5);
 xlabel('X'); ylabel('Y');
 title('Trajectoire XY');
 axis([0 100 0 40]);
