@@ -1,15 +1,26 @@
 function simTrajectoire
 %% - Simulation de la trajectoire du projectile
 
+%% Initialisation
+clear;clc;
 %% - Données
-k_air = 0.02;                 % coefficient de frottement
-a_air = @(v) -k_air * v^2;      % frottement
-g = 9.81;
+% Données du drag
+% Drag pour un ballon de basket 
+rho = 1.2041; % Masse volumique de l'air à 20°C [kg/m3]
+Cx = 0.45; % Coefficient de trainée d'un ballon
+m = 0.6; % Masse du ballon [kg]
+R = 0.12 ; % Rayon du ballon [m]
+Surf = pi*R^2; % Surface de contact du ballon [m^2]
 
+% Données de la simulation
+g = 9.81;
 v0 = 30;                      % vitesse initiale
 theta0 = 50 * pi/180;         % angle en radians
 dt = 0.01;                    % pas de temps
-
+%% Algorithme
+% Calcul du coefficient de trainé et du drag
+k_air = 1/2*rho*Cx*Surf/m;
+a_air = @(v) -k_air * v^2; 
 % Décomposition de la vitesse initiale
 vx = v0 * cos(theta0);
 vy = v0 * sin(theta0);
