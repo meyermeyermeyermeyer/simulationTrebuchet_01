@@ -3,7 +3,7 @@ clc; clear; close all;
 
 %% --- SECTION 1 : CONFIGURATION ET OPTIMISATION ---
 cible_Hmax = 8; % Hauteur maximale à atteindre (plafond)
-cible_Dist = 4; % Distance de la cible par rapport à la cible 
+cible_Dist = 20; % Distance de la cible par rapport à la cible 
 p0 = [15, 60]; % v0_final, theta0_final posé arbitrairement
 
 options = optimset('Display', 'none', 'TolX', 1e-4);
@@ -74,7 +74,11 @@ end
 %% --- FONCTION PHYSIQUE AMÉLIORÉE ---
 function [y_max, x_final, X, Y, T, V_mag, A_mag, idx_para] = sim_physique_complete(v0, theta0_deg)
     % Paramètres constants
-    rho = 1.2041; g = 9.81; m = 0.6; dt = 0.005;
+    rho = 1.2041;
+    g = 9.81; 
+    m = 0.6; 
+    dt = 0.005;
+    % Ajouter les rayons
     k_bal = 0.5 * rho * 0.45 * (pi * 0.12^2) / m;
     k_par = 0.5 * rho * 1.5 * (pi * 0.15^2) / m;
     
@@ -89,7 +93,7 @@ function [y_max, x_final, X, Y, T, V_mag, A_mag, idx_para] = sim_physique_comple
     
     while y >= 0
         % Calcul du coefficient k
-        if x >= 3
+        if t >= 1.4
             k = k_bal + k_par;
             if idx_para == 0, idx_para = length(X); end
         else
@@ -108,7 +112,6 @@ function [y_max, x_final, X, Y, T, V_mag, A_mag, idx_para] = sim_physique_comple
         A_mag(end+1) = sqrt(ax^2 + ay^2); %#ok<AGROW>
         
         if y > y_max, y_max = y; end
-        if x > 20, break; end 
     end
     x_final = x;
 end
