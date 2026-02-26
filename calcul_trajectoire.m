@@ -41,11 +41,5 @@ function [dist_x, h_max] = calcul_trajectoire(t, y, p, alpha_target_deg)
     xp = x0 + vx0 * t_p;
     yp = y0 + vy0 * t_p - 0.5 * g * t_p.^2;
 
-    figure('Color', 'w'); hold on; grid on;
-    plot(xp, yp, 'r--', 'LineWidth', 2);
-    plot(x0, y0, 'ko', 'MarkerFaceColor', 'k');
-    line([-5, dist_x+5], [-h_pivot_sol, -h_pivot_sol], 'Color', 'k', 'LineWidth', 2);
-    title(sprintf('Trajectoire : Portée = %.2f m | H_{max} = %.2f m', dist_x, h_max));
-    xlabel('Distance (m)'); ylabel('Hauteur (m)');
-    axis equal;
+    
 end
