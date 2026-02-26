@@ -15,6 +15,7 @@ p.l2 = 0.48;         % Longueur bras côté contrepoids [m]
 p.l3 = 0.435;         % Longueur bras contrepoids [m]
 p.l4 = 0.784;         % Longueur corde [m]
 p.g = 9.81;         % Gravité [m/s²]
+p.h_pivot = 2.105;
 
 % Moment d'inertie du bras autour du pivot
 p.Ibeam = (1/3)*p.mbeam*(p.l1^2 + p.l2^2);
@@ -42,38 +43,38 @@ fprintf('Résolution de l''équation différentielle...\n');
 fprintf('Simulation terminée: %d points calculés.\n', length(t));
 
 % --- Visualisation des Angles ---
-figure('Color', 'w', 'Position', [100 100 1000 600]);
+%figure('Color', 'w', 'Position', [100 100 1000 600]);
 
-subplot(3,1,1);
-plot(t, rad2deg(y(:,1)), 'LineWidth', 2, 'Color', [0.8 0.3 0.1]);
-ylabel('\theta [deg]'); grid on;
-title('Évolution des Angles du Trébuchet');
+%subplot(3,1,1);
+%plot(t, rad2deg(y(:,1)), 'LineWidth', 2, 'Color', [0.8 0.3 0.1]);
+%ylabel('\theta [deg]'); grid on;
+%title('Évolution des Angles du Trébuchet');
 
-subplot(3,1,2);
-plot(t, rad2deg(y(:,2)), 'LineWidth', 2, 'Color', [0.2 0.4 0.9]);
-ylabel('\psi [deg]'); grid on;
+%subplot(3,1,2);
+%plot(t, rad2deg(y(:,2)), 'LineWidth', 2, 'Color', [0.2 0.4 0.9]);
+%ylabel('\psi [deg]'); grid on;
 
-subplot(3,1,3);
-plot(t, rad2deg(y(:,3)), 'LineWidth', 2, 'Color', [0.9 0.1 0.3]);
-ylabel('\phi [deg]'); grid on;
-xlabel('Temps [s]');
+%subplot(3,1,3);
+%plot(t, rad2deg(y(:,3)), 'LineWidth', 2, 'Color', [0.9 0.1 0.3]);
+%ylabel('\phi [deg]'); grid on;
+%xlabel('Temps [s]');
 
 % --- Visualisation des Vitesses Angulaires ---
-figure('Color', 'w', 'Position', [120 120 1000 600]);
+%figure('Color', 'w', 'Position', [120 120 1000 600]);
 
-subplot(3,1,1);
-plot(t, rad2deg(y(:,4)), 'LineWidth', 2, 'Color', [0.8 0.3 0.1]);
-ylabel('d\theta/dt [deg/s]'); grid on;
-title('Vitesses Angulaires du Trébuchet');
+%subplot(3,1,1);
+%plot(t, rad2deg(y(:,4)), 'LineWidth', 2, 'Color', [0.8 0.3 0.1]);
+%ylabel('d\theta/dt [deg/s]'); grid on;
+%title('Vitesses Angulaires du Trébuchet');
 
-subplot(3,1,2);
-plot(t, rad2deg(y(:,5)), 'LineWidth', 2, 'Color', [0.2 0.4 0.9]);
-ylabel('d\psi/dt [deg/s]'); grid on;
+%subplot(3,1,2);
+%plot(t, rad2deg(y(:,5)), 'LineWidth', 2, 'Color', [0.2 0.4 0.9]);
+%ylabel('d\psi/dt [deg/s]'); grid on;
 
-subplot(3,1,3);
-plot(t, rad2deg(y(:,6)), 'LineWidth', 2, 'Color', [0.9 0.1 0.3]);
-ylabel('d\phi/dt [deg/s]'); grid on;
-xlabel('Temps [s]');
+%subplot(3,1,3);
+%plot(t, rad2deg(y(:,6)), 'LineWidth', 2, 'Color', [0.9 0.1 0.3]);
+%ylabel('d\phi/dt [deg/s]'); grid on;
+%xlabel('Temps [s]');
 
 
 % --- Animation ---
@@ -143,7 +144,8 @@ angle_test = 31;
 
 [dist, haut] = calcul_trajectoire(t, y, p, angle_test);
 
-% --- CALCUL DE LA VITESSE DE SORTIE (PREMIER PIC LOCAL) ---
+
+% --- CALCUL DE LA VITESSE DE SORTIE ---
 % Extraction des variables d'état
 th  = y(:,1);  
 ps  = y(:,2);
@@ -156,23 +158,26 @@ vy = -p.l1 * cos(th) .* dth + p.l4 * sin(ps) .* dps;
 v_norme = sqrt(vx.^2 + vy.^2);
 
 % --- LOGIQUE DE DÉTECTION DU PREMIER PIC ---
-% On cherche le premier index où la vitesse commence à redescendre
 idx_pics = find(diff(v_norme) < 0, 1); 
 
 if isempty(idx_pics)
-    % Si aucun pic n'est trouvé, on prend la valeur maximale par défaut
     [v_max, idx] = max(v_norme);
     fprintf('Note: Aucun pic local détecté, utilisation du max absolu.\n');
 else
-    idx = idx_pics; % On s'arrête au premier sommet trouvé
+    idx = idx_pics;
     v_max = v_norme(idx);
 end
 
-
-%% ======================================
+% ======================================
 % Calcul de l'angle de sortie au pic
 angle_sortie_rad = atan2(vy(idx), vx(idx));
 angle_sortie_deg = rad2deg(angle_sortie_rad);
+
+% Position du projectile 
+x_proj_pivot = -p.l1 * cos(th(idx)) + p.l4 * sin(ps(idx));
+y_proj_pivot = -p.l1 * sin(th(idx)) - p.l4 * cos(ps(idx));
+
+
 
 % --- AFFICHAGE DES RÉSULTATS ---
 fprintf('\n====================================\n');
@@ -181,20 +186,23 @@ fprintf('====================================\n');
 fprintf('Vitesse de sortie     : %.2f m/s\n', v_max);
 fprintf('Angle de sortie       : %.2f degrés\n', angle_sortie_deg);
 fprintf('Temps du pic          : %.3f s\n', t(idx));
+fprintf('------------------------------------\n');
+fprintf('POSITION AU LANCEMENT\n');
+fprintf('------------------------------------\n');
+fprintf('x : %.3f m\n', x_proj_pivot);
+fprintf('y : %.3f m\n', y_proj_pivot+p.h_pivot);
 fprintf('====================================\n');
 
 % --- Graphique de la Vitesse ---
 figure('Color', 'w', 'Name', 'Analyse de la vitesse de sortie');
 plot(t, v_norme, 'LineWidth', 2, 'Color', [0.2 0.2 0.2]); hold on;
 plot(t(idx), v_max, 'ro', 'MarkerSize', 12, 'LineWidth', 2, 'MarkerFaceColor', 'r');
-
-% Habillage du graphique
 xlabel('Temps [s]'); 
 ylabel('Vitesse du projectile [m/s]');
 title(['Vitesse de sortie : ', num2str(v_max, '%.2f'), ' m/s à ', num2str(angle_sortie_deg, '%.1f'), '°']);
 legend('Vitesse instantanée', 'Premier maximum (Lâcher optimal)', 'location', 'best');
 grid on;
-% ============================================================
+
 
 
 
@@ -273,6 +281,7 @@ end
 
 fprintf('\nTension maximale: %.1f N\n', max(Tension));
 fprintf('Tension minimale: %.1f N\n', min(Tension));
+fprintf('====================================\n');
 
 figure('Color','w');
 plot(t, Tension, 'LineWidth', 2);
