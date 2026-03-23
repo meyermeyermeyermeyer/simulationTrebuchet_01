@@ -1,0 +1,390 @@
+clear; clc; close all;
+
+% =========================================================
+% SIMULATION TRÉBUCHET — PHASE 1 (Rail) + PHASE 2 (Libre)
+% =========================================================
+%
+% PHASE 1 — Contrainte holonome : projectile sur rail horizontal
+%   Contrainte: h(θ,ψ) = l1·sin(θ) + l4·cos(ψ) − C_rail = 0
+%
+%   Résolution par multiplicateur de Lagrange (système KKT 4×4) :
+%
+%     [ M    −J' ] [ q̈ ]   [ F     ]
+%     [ J     0  ] [ λ ] = [ γ     ]
+%
+%   avec J = ∂h/∂q = [l1·cos(θ), −l4·sin(ψ), 0]
+%        γ  = l1·sin(θ)·θ̇² + l4·cos(ψ)·ψ̇²  (contrainte niveau accél.)
+%        λ  = −N_rail  (force normale du rail sur le projectile)
+%
+%   Transition Phase 1→2 : λ = 0  (décollage, N_rail → 0)
+%
+% PHASE 2 — Trébuchet libre (votre code original)
+% =========================================================
+
+%% ─── Paramètres Physiques ───────────────────────────────────────────────
+lb2kg = 0.454;
+
+p.m      = 2.0;              % Masse projectile          [kg]
+p.M      = 250 * lb2kg;      % Masse contrepoids         [kg]
+p.mbeam  = 10.0;             % Masse du bras             [kg]
+p.l1     = 2.006;            % Bras côté projectile      [m]
+p.l2     = 0.508;             % Bras côté contrepoids     [m]
+p.l3     = 0.4572;            % Pendule contrepoids       [m]
+p.l4     = 0.998;            % Longueur fronde           [m]
+p.g      = 9.81;             % Gravité                   [m/s²]
+p.h_pivot = 2.1018;           % Hauteur du pivot          [m]
+
+p.Ibeam = 6.28;   % Inertie du bras [kg·m²]
+
+%% ─── Conditions Initiales ────────────────────────────────────────────────
+th0  = deg2rad(60);   % Angle du bras          [rad]
+ps0  = deg2rad(80);   % Angle de la fronde     [rad]
+ph0  = deg2rad(0);    % Angle du contrepoids   [rad]
+dth0 = 0;  dps0 = 0;  dph0 = 0;
+
+y0 = [th0; ps0; ph0; dth0; dps0; dph0];
+
+% Vérification de cohérence de la contrainte initiale
+% (triviale si toutes les vitesses initiales sont nulles)
+vel_constraint_check = p.l1*cos(th0)*dth0 - p.l4*sin(ps0)*dps0;
+if abs(vel_constraint_check) > 1e-10
+    warning(['Conditions initiales incohérentes avec la contrainte rail.\n' ...
+             'Erreur de contrainte vitesse: %.2e'], vel_constraint_check);
+end
+
+%% ─── Paramètres Rail (Phase 1) ───────────────────────────────────────────
+% La constante de contrainte est calculée directement depuis y0,
+% de sorte que le rail passe exactement par la position initiale du projectile.
+%
+%   C_rail = l1·sin(θ₀) + l4·cos(ψ₀)
+%   Y_rail = h_pivot − C_rail   [hauteur absolue du rail au-dessus du sol]
+p.C_rail = p.l1*sin(th0) + p.l4*cos(ps0);
+p.Y_rail = p.h_pivot - p.C_rail;
+
+% Position X initiale du projectile (pour référence)
+x0_proj = -p.l1*cos(th0) + p.l4*sin(ps0);
+
+fprintf('╔══════════════════════════════════════════╗\n');
+fprintf('║      SIMULATION TRÉBUCHET 2 PHASES       ║\n');
+fprintf('╠══════════════════════════════════════════╣\n');
+fprintf('║  Rail (Phase 1) :                        ║\n');
+fprintf('║    Hauteur absolue  : %.3f m            ║\n', p.Y_rail);
+fprintf('║    X initial proj.  : %.3f m            ║\n', x0_proj);
+fprintf('╚══════════════════════════════════════════╝\n\n');
+
+%% ══════════════════════════════════════════════════════════════════════
+%%  PHASE 1 — Projectile Contraint sur le Rail
+%% ══════════════════════════════════════════════════════════════════════
+fprintf('► Phase 1 : Résolution avec contrainte rail...\n');
+
+opts_p1 = odeset('RelTol', 1e-7, 'AbsTol', 1e-9, ...
+                 'Events', @(t,y) rail_liftoff_event(t, y, p));
+
+[t1, y1, te1, ye1, ~] = ode45( ...
+    @(t,y) trebuchet_phase1(t, y, p), [0, 1], y0, opts_p1);
+
+%% ══════════════════════════════════════════════════════════════════════
+%%  PHASE 2 — Trébuchet Libre (Système Non-Contraint)
+%% ══════════════════════════════════════════════════════════════════════
+opts_p2 = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
+
+if ~isempty(te1)
+    p.t_transition   = te1(1);
+    p.idx_transition = length(t1);   % indice du dernier pt Phase 1 dans [t,y]
+    y_trans = ye1(1,:)';
+
+    fprintf('   ✓ Décollage du rail à t = %.4f s\n', p.t_transition);
+    fprintf('   Position X proj. au décollage : %.3f m\n', ...
+        -p.l1*cos(y_trans(1)) + p.l4*sin(y_trans(2)));
+    fprintf('\n► Phase 2 : Résolution libre...\n');
+
+    [t2, y2] = ode45( ...
+        @(t,y) trebuchet_dynamics(t, y, p), ...
+        [p.t_transition, 1], y_trans, opts_p2);
+
+    % Concaténer les deux phases (on saute le 1er point de t2 = doublon)
+    t = [t1;       t2(2:end)    ];
+    y = [y1;       y2(2:end,:)  ];
+
+else
+    warning('Aucun décollage détecté — simulation entière en Phase 1.');
+    p.t_transition   = inf;
+    p.idx_transition = length(t1);
+    t = t1;   y = y1;
+end
+
+n_p1 = p.idx_transition;
+n_p2 = length(t) - n_p1;
+fprintf('\nSimulation terminée : %d points au total\n', length(t));
+fprintf('  Phase 1 : %d points (0 → %.4f s)\n', n_p1, p.t_transition);
+fprintf('  Phase 2 : %d points (%.4f → %.3f s)\n\n', n_p2, p.t_transition, t(end));
+
+%% ─── Vérification de la Contrainte en Phase 1 ────────────────────────
+constraint_violation = p.l1*sin(y1(:,1)) + p.l4*cos(y1(:,2)) - p.C_rail;
+fprintf('Violation max de contrainte en Phase 1 : %.2e m\n\n', ...
+    max(abs(constraint_violation)));
+
+%% ─── Force Normale du Rail (Phase 1) ─────────────────────────────────
+% N_rail = −λ  (positif = le rail pousse le projectile vers le haut)
+N_rail = zeros(n_p1, 1);
+for i = 1:n_p1
+    [~, lambda_i] = compute_lambda(y1(i,:)', p);
+    N_rail(i) = -lambda_i;
+end
+
+figure('Color', 'w', 'Name', 'Force Normale du Rail (Phase 1)');
+plot(t1, N_rail, 'LineWidth', 2, 'Color', [0.1 0.5 0.9]);
+hold on;
+yline(0, 'r--', 'LineWidth', 1.5, 'Label', 'Décollage (N=0)');
+xlabel('Temps [s]');
+ylabel('Force Normale N_{rail} [N]');
+title('Force Normale du Rail sur le Projectile — Phase 1');
+grid on;
+
+%% ─── Animation ───────────────────────────────────────────────────────
+% La fonction animation() reçoit le vecteur t et la matrice y combinés
+% (Phase 1 + Phase 2), ainsi que p qui contient :
+%   p.t_transition   : instant de décollage [s]
+%   p.idx_transition : indice correspondant dans t
+%   p.Y_rail         : hauteur absolue du rail [m]
+%   p.C_rail         : constante de contrainte
+% → votre fonction animation() peut utiliser ces champs pour dessiner
+%   le rail pendant la Phase 1.
+fprintf('Lancement de l''animation...\n');
+animation(t, y, p);
+
+%% ─── Trajectoire & Vitesse de Sortie ────────────────────────────────
+angle_test = 31;
+[dist, haut] = calcul_trajectoire(t, y, p, angle_test);
+
+th  = y(:,1);   ps  = y(:,2);
+dth = y(:,4);   dps = y(:,5);
+
+% Vitesse du projectile (dérivée de xm, ym par rapport au temps)
+%   xm = −l1·cos(θ) + l4·sin(ψ)   →  ẋm =  l1·sin(θ)·θ̇ + l4·cos(ψ)·ψ̇
+%   ym = −l1·sin(θ) − l4·cos(ψ)   →  ẏm = −l1·cos(θ)·θ̇ + l4·sin(ψ)·ψ̇
+vx      =  p.l1*sin(th).*dth + p.l4*cos(ps).*dps;
+vy      = -p.l1*cos(th).*dth + p.l4*sin(ps).*dps;
+v_norme = sqrt(vx.^2 + vy.^2);
+
+% Détection du premier pic (lâcher optimal)
+idx_pic = find(diff(v_norme) < 0, 1);
+if isempty(idx_pic)
+    [v_max, idx] = max(v_norme);
+    fprintf('Note: Aucun pic local détecté, utilisation du max absolu.\n');
+else
+    idx   = idx_pic;
+    v_max = v_norme(idx);
+end
+
+angle_sortie_rad = atan2(vy(idx), vx(idx));
+angle_sortie_deg = rad2deg(angle_sortie_rad);
+x_proj = -p.l1*cos(th(idx)) + p.l4*sin(ps(idx));
+y_proj = -p.l1*sin(th(idx)) - p.l4*cos(ps(idx));
+
+fprintf('\n════════════════════════════════════\n');
+fprintf('   RÉSULTATS DU LANCEMENT           \n');
+fprintf('════════════════════════════════════\n');
+fprintf('Vitesse de sortie     : %.2f m/s\n', v_max);
+fprintf('Angle de sortie       : %.2f °\n',   angle_sortie_deg);
+fprintf('Temps du pic          : %.3f s\n',   t(idx));
+if t(idx) <= p.t_transition
+    fprintf('Phase au lancement    : Phase 1 (sur rail)\n');
+else
+    fprintf('Phase au lancement    : Phase 2 (vol libre)\n');
+end
+fprintf('────────────────────────────────────\n');
+fprintf('Position au lancement:\n');
+fprintf('  x = %.3f m\n', x_proj);
+fprintf('  y = %.3f m (abs.)\n', y_proj + p.h_pivot);
+fprintf('════════════════════════════════════\n\n');
+
+figure('Color', 'w', 'Name', 'Vitesse de sortie');
+plot(t, v_norme, 'LineWidth', 2, 'Color', [0.2 0.2 0.2]); hold on;
+plot(t(idx), v_max, 'ro', 'MarkerSize', 12, 'LineWidth', 2, 'MarkerFaceColor', 'r');
+if isfinite(p.t_transition)
+    xline(p.t_transition, 'b--', 'LineWidth', 1.5, 'Label', 'Décollage rail');
+end
+xlabel('Temps [s]');
+ylabel('Vitesse [m/s]');
+title(sprintf('Vitesse de sortie : %.2f m/s à %.1f°', v_max, angle_sortie_deg));
+legend('Vitesse instantanée', 'Premier maximum', 'Location', 'best');
+grid on;
+
+%% ─── Tension dans la Corde ───────────────────────────────────────────
+% Note : en Phase 1, la tension calculée ici est la tension réelle dans
+% la fronde. En Phase 1, le rail exerce une force additionnelle sur le
+% projectile, mais la tension de la fronde reste la même formulation de
+% Newton appliquée dans la direction radiale de la fronde.
+N_pts   = length(t);
+Tension = zeros(N_pts, 1);
+
+for i = 1:N_pts
+    th_i  = y(i,1);  ps_i  = y(i,2);  ph_i  = y(i,3);
+    dth_i = y(i,4);  dps_i = y(i,5);  dph_i = y(i,6);
+
+    [Mmat, F] = masse_et_force(th_i, ps_i, ph_i, dth_i, dps_i, dph_i, p);
+
+    if i <= n_p1
+        % Phase 1 : accélérations via système contraint KKT
+        J     = [p.l1*cos(th_i), -p.l4*sin(ps_i), 0];
+        gamma = p.l1*sin(th_i)*dth_i^2 + p.l4*cos(ps_i)*dps_i^2;
+        sol   = [Mmat, -J'; J, 0] \ [F; gamma];
+        accel = sol(1:3);
+    else
+        % Phase 2 : accélérations libres
+        accel = Mmat \ F;
+    end
+
+    ddth_i = accel(1);
+    ddps_i = accel(2);
+
+    % Accélération absolue du projectile (relatif au pivot)
+    ax = -p.l1*cos(th_i)*dth_i^2 - p.l1*sin(th_i)*ddth_i ...
+         - p.l4*sin(ps_i)*dps_i^2 + p.l4*cos(ps_i)*ddps_i;
+    ay = -p.l1*sin(th_i)*dth_i^2 + p.l1*cos(th_i)*ddth_i ...
+         - p.l4*cos(ps_i)*dps_i^2 - p.l4*sin(ps_i)*ddps_i;
+
+    % Direction radiale de la fronde (de l'extrémité du bras vers le projectile)
+    erx =  sin(ps_i);
+    ery = -cos(ps_i);
+
+    % Projection et calcul de la tension
+    a_radial   = ax*erx + ay*ery;
+    Tension(i) = p.m * (a_radial + p.g*ery);
+end
+
+fprintf('Tension max : %.1f N\n', max(Tension));
+fprintf('Tension min : %.1f N\n', min(Tension));
+
+figure('Color', 'w', 'Name', 'Tension dans la corde');
+plot(t, Tension, 'LineWidth', 2, 'Color', [0.8 0.3 0.1]); hold on;
+if isfinite(p.t_transition)
+    xline(p.t_transition, 'b--', 'LineWidth', 1.5, 'Label', 'Décollage rail');
+end
+xlabel('Temps [s]');
+ylabel('Tension [N]');
+title('Tension dans la Fronde');
+grid on;
+
+
+%% ╔══════════════════════════════════════════════════════════════════╗
+%% ║                      FONCTIONS LOCALES                          ║
+%% ╚══════════════════════════════════════════════════════════════════╝
+
+% ─────────────────────────────────────────────────────────────────────
+%  PHASE 2 : Dynamique Non-Contrainte  (votre code original, refactorisé)
+% ─────────────────────────────────────────────────────────────────────
+function dydt = trebuchet_dynamics(~, y, p)
+    th = y(1); ps = y(2); ph = y(3);
+    dth = y(4); dps = y(5); dph = y(6);
+
+    [M, F] = masse_et_force(th, ps, ph, dth, dps, dph, p);
+    accel  = M \ F;
+    dydt   = [y(4:6); accel];
+end
+
+% ─────────────────────────────────────────────────────────────────────
+%  PHASE 1 : Dynamique avec Contrainte Rail (Système KKT)
+% ─────────────────────────────────────────────────────────────────────
+function dydt = trebuchet_phase1(~, y, p)
+    th = y(1); ps = y(2); ph = y(3);
+    dth = y(4); dps = y(5); dph = y(6);
+
+    [Mmat, F] = masse_et_force(th, ps, ph, dth, dps, dph, p);
+
+    % ── Contrainte holonome ──────────────────────────────────────────
+    % h(θ,ψ) = l1·sin(θ) + l4·cos(ψ) − C_rail = 0
+    %
+    % Jacobien : J = ∂h/∂q = [l1·cos(θ),  −l4·sin(ψ),  0]
+    J = [p.l1*cos(th),  -p.l4*sin(ps),  0];   % (1×3)
+
+    % RHS au niveau accélération (d²h/dt² = 0) :
+    %   J·q̈ = l1·sin(θ)·θ̇² + l4·cos(ψ)·ψ̇²  = γ
+    gamma = p.l1*sin(th)*dth^2 + p.l4*cos(ps)*dps^2;
+
+    % ── Système augmenté KKT (4×4) ──────────────────────────────────
+    %   [ M   −J' ] [ q̈ ]   [ F ]
+    %   [ J    0  ] [ λ ] = [ γ ]
+    %
+    %  λ = multiplicateur de Lagrange
+    %  N_rail = −λ  (force normale du rail, >0 = pousse vers le haut)
+    % ────────────────────────────────────────────────────────────────
+    A_aug = [Mmat,  -J';
+             J,      0 ];      % 4×4
+    b_aug = [F;   gamma];      % 4×1
+
+    sol   = A_aug \ b_aug;
+    accel = sol(1:3);
+    % lambda = sol(4);  % disponible si nécessaire
+
+    dydt = [y(4:6); accel];
+end
+
+% ─────────────────────────────────────────────────────────────────────
+%  ÉVÉNEMENT : Décollage du Rail  (λ = 0,  N_rail = 0)
+%
+%  Physique : λ est négatif en Phase 1 (le rail pousse le projectile
+%  vers le haut, N = −λ > 0). Quand la dynamique libre porterait
+%  naturellement le projectile AU-DESSUS du rail, λ → 0. On bascule
+%  alors en Phase 2 (le rail ne peut pousser que, jamais tirer).
+%
+%  direction = +1 : on détecte le passage λ : négatif → zéro.
+% ─────────────────────────────────────────────────────────────────────
+function [value, isterminal, direction] = rail_liftoff_event(~, y, p)
+    [~, lambda] = compute_lambda(y, p);
+    value       = lambda;    % événement quand λ = 0
+    isterminal  = 1;         % arrêter la Phase 1
+    direction   = 1;         % λ monte de négatif vers zéro (décollage)
+end
+
+% ─────────────────────────────────────────────────────────────────────
+%  HELPER : Calcul du Multiplicateur de Lagrange λ
+% ─────────────────────────────────────────────────────────────────────
+function [accel, lambda] = compute_lambda(y, p)
+    th = y(1); ps = y(2); ph = y(3);
+    dth = y(4); dps = y(5); dph = y(6);
+
+    [Mmat, F] = masse_et_force(th, ps, ph, dth, dps, dph, p);
+
+    J     = [p.l1*cos(th),  -p.l4*sin(ps),  0];
+    gamma = p.l1*sin(th)*dth^2 + p.l4*cos(ps)*dps^2;
+
+    A_aug = [Mmat, -J'; J, 0];
+    b_aug = [F;  gamma];
+    sol   = A_aug \ b_aug;
+
+    accel  = sol(1:3);
+    lambda = sol(4);
+end
+
+% ─────────────────────────────────────────────────────────────────────
+%  HELPER : Matrice de Masse M  et  Vecteur de Force F
+%  (commun aux deux phases — évite la duplication de code)
+% ─────────────────────────────────────────────────────────────────────
+function [Mmat, F] = masse_et_force(th, ps, ph, dth, dps, dph, p)
+    % ── Matrice de Masse (3×3, symétrique) ──────────────────────────
+    M11 = p.Ibeam + p.M*p.l2^2 + p.l1^2*p.m;
+    M12 = -p.l1*p.l4*p.m*sin(ps - th);
+    M13 =  p.M*p.l2*p.l3*sin(ph - th);
+    M22 =  p.l4^2*p.m;
+    M33 =  p.M*p.l3^2;
+
+    Mmat = [M11, M12, M13;
+            M12, M22,   0;
+            M13,   0, M33];
+
+    % ── Vecteur de Force Généralisée (3×1) ──────────────────────────
+    F1 = -p.M*p.g*p.l2*cos(th) ...
+         - p.M*p.l2*p.l3*cos(ph - th)*dph^2 ...
+         + p.g*p.l1*p.m*cos(th) ...
+         + p.g*p.l1*p.mbeam*cos(th)/2 ...
+         - p.g*p.l2*p.mbeam*cos(th)/2 ...
+         + p.l1*p.l4*p.m*cos(ps - th)*dps^2;
+
+    F2 = -p.l4*p.m*(p.g*sin(ps) + p.l1*cos(ps - th)*dth^2);
+
+    F3 =  p.M*p.l3*(-p.g*sin(ph) + p.l2*cos(ph - th)*dth^2);
+
+    F = [F1; F2; F3];
+end
