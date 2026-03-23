@@ -1,0 +1,229 @@
+%% Auteur : CIP ; Date 27 mars 2026; Ttitre : Figure de Chladni (Devoir conjoint)
+
+%% Initialisation 
+
+clc, clear , close all hidden
+
+%% Données
+
+L = 0.1; % longueur d'un côté de le membrane carré en m
+T = 200; % Tension linéique de la membrane en N/m
+rho = 0.296; % kg/m^2
+P = 6; % Nombre de figures ou des plus petites fréquences
+N = 100; % Nombre de points par ligne
+
+
+
+%% Algorithme 
+
+% Données dépendante
+
+c = sqrt(T/rho); % vitesse de propagation des ondes dans la membrane
+h = L/(N+1); % pas 
+dof = N^2;
+
+%% Étape A i.
+
+% Réécriture de l'équation d'onde avec comme solution u(x,y,t) =
+% u(x,y)*sin(wt)
+% L'équation d'onde est d2u(x,y,t)/dt2 = c^2*(d2u(x,y,t)/dx2 + d2u(x,y,t)/dy2)
+% En utilisant la solution fournis nous obtenons : 
+% -w^2 u(x,y) = c^2*(d2u(x,y,t)/dx2 + d2u(x,y,t)/dy2) avec comme condition
+% limite au déplacement : u = 0 pour les quatres bords de la membrane, donc
+% quand i = 1 ou N et quand j = 1 ou N. 
+
+%% Étape A ii.
+
+
+% La méthode de différence sera seulement évalué avec la dérivation
+% numérique centré, car au bords de la membrane on sait déjà que u = 0. 
+
+% Ainsi, en x nous avons : 
+% (u_{i+1,j} -2*u_{i,j} + u_{i-1,j})/h^2
+
+% En y nous avons : 
+
+%(u_{i,j+1} -2*u_{i,j} + u_{i,j-1})/h^2
+
+% On peu combiné les termes en x et y qui correspond dans l'équation d'onde
+% à (d2u(x,y,t)/dx2 + d2u(x,y,t)/dy2).
+
+%(u_{i+1,j} + u_{i-1,j} + u_{i,j+1} + u_{i,j-1} -4*u_{i,j})/h^2
+
+% On obtient donc comme équation d'onde 2D : 
+
+% -w^2 u(x,y) = c^2*((u_{i+1,j} + u_{i-1,j} + u_{i,j+1} + u_{i,j-1} -4*u_{i,j})/h^2)
+
+% Les conditions limites dans cette forme s'écrivent comme,
+% u_{1,1} = 0 ; u_{N,1} = 0 ; u_{1,N} = 0 ; u_{N,N} = 0.
+
+
+%% Étape A iii.
+
+% Pour ce déplacer dans la plaque 2D avec un array 1D, noous utilisons
+% comme incrémentation k = (i-1)*N + j où i sont les lignes et j les
+% colonnes. 
+
+
+
+K = spalloc(dof,dof,5*dof);
+M = speye(dof);
+
+coeff = 1/h^2;
+
+for i = 1:N
+    for j = 1:N
+
+        k = (i-1)*N + j;
+
+        K(k,k) = -4*coeff;
+
+        if i > 1
+            K(k-N,k) = coeff;
+        end
+
+        if i < N
+            K(k+N,k) = coeff;
+        end
+
+        if j > 1
+            K(k-1,k) = coeff;
+        end
+
+        if j < N
+            K(k+1,k) = coeff;
+        end
+    end
+end
+
+%% Étape B iv.
+
+% Il faut résoudre l'équation [K]*{u} = lambda*[M]*{u} où lambda est -w^2/c^2
+% On utilise la fonction matlab eigs avec smallestabs.
+
+opts.tol  = 1e-10;
+opts.maxit = 500;
+ 
+[V, D] = eigs(K, M, P, 'smallestabs', opts);
+
+lambda = diag(D); % Extraction des eigenvalues
+
+[lambda, idx] = sort(lambda);  % Tri croissant
+V = V(:, idx); % Tri des vecteurs propres
+
+%% Étape B v.
+
+% Lambda = -w^2/c^2. Donc, w = sqrt(-lambda*c^2) et f_nat = w/2pi
+
+w_propres = sqrt(-lambda.*c.^2); % rad/s
+f_propres = w_propres./(2*pi); %Hz
+
+%% Étape B vi.
+
+% Pseudo-déclaration de l'aray x et y utiliser pour afficher les données (
+% utiliser ensuite pour ajouter les bords x= 0 et x= l). Ces deux arrays
+% sont utiliser pour établir la dimension du meshgrid. 
+x_int = (1:N) * h; 
+y_int = (1:N) * h;  
+
+% Création du grid avec les bords de la plaque pour afficher nos vecteurs
+% propres. Les donnés intérieurs du grid seront remplacé par les données
+% des vecteurs propres. 
+x_full = [0, x_int, L];
+y_full = [0, y_int, L];
+[Xf, Yf] = meshgrid(x_full, y_full);
+
+% Détermination du nombre de figure à afficher. 
+nrows = ceil(P/3);
+ncols = min(P, 3);
+
+figure('Name', 'Étape B vi — Déformées propres (MDF)', ...
+       'NumberTitle', 'off', 'Position', [50, 50, 1000, 600]);
+
+for p = 1:P
+    % Extraction du vecteur propre p et on le remet dans la forme 2D(il
+    % était dans la forme 1D comme array)
+    mode_vec = V(:,p);                      
+    mode_mat = reshape(mode_vec, [N, N]);   
+
+    % Normalisation des données pour comparer les amplitudes de u entre
+    % différentes fréquences. 
+    mode_mat = mode_mat / max(abs(mode_mat(:)));
+
+    % Création de la matrice U utiliser pour afficher les données, ajout
+    % des bords u = 0 et ajout des données du vecteur propre dans les
+    % données intérieurs de U. 
+    U_full = zeros(N+2, N+2);
+    U_full(2:end-1, 2:end-1) = mode_mat;
+
+    % Affichage 3D des données
+    subplot(nrows, ncols, p);
+    surf(Xf, Yf, U_full, 'EdgeColor', 'none');
+    colormap('jet');
+    colorbar;
+    xlabel('x [m]');
+    ylabel('y [m]');
+    zlabel('u [normalisé]');
+    title(sprintf('Mode %d — f = %.1f Hz', (P+1)-p, f_propres(p)));
+    view([-35, 30]);
+    axis tight;
+    shading interp;
+end
+
+sgtitle('Déformées propres de la membrane (différences finies)');
+
+
+%% Étape B vii
+
+tol_neg = -0.12;
+tol_pos =  0.12;
+
+figure('Name', 'Étape B vii — Figures de Chladni (MDF)', ...
+       'NumberTitle', 'off', 'Position', [50, 700, 1000, 600]);
+
+for p = 1:P
+
+    mode_vec = V(:, p);
+    mode_mat = reshape(mode_vec, [N, N]);
+    mode_mat = mode_mat / max(abs(mode_mat(:)));
+
+    U_full = zeros(N+2, N+2);
+    U_full(2:end-1, 2:end-1) = mode_mat;
+
+
+    masque = (U_full > tol_neg) & (U_full < tol_pos);
+
+    % Garder seulement les cellules du masque qui sont bordées
+    % par au moins un voisin blanc (0) — ce sont les contours
+    masque_erode = masque & ~imerode(masque, ones(3,3));
+
+    subplot(nrows, ncols, p);
+
+    imagesc(x_full, y_full, masque_erode);
+    colormap(gca, [1 1 1; 0 0 0]);
+    set(gca, 'YDir', 'normal');
+    axis equal tight;
+    hold on;
+
+    plot([0 L L 0 0], [0 0 L L 0], 'k-', 'LineWidth', 2);
+
+    xlabel('x [m]');
+    ylabel('y [m]');
+    title(sprintf('Mode %d — f = %.1f Hz', (P+1)-p, f_propres(p)));
+    hold off;
+end
+
+sgtitle(sprintf('Figures de Chladni — contours [%.2f, %.2f]', tol_neg, tol_pos));
+
+
+
+
+
+
+
+
+
+
+
+
+
