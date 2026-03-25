@@ -2,7 +2,7 @@
 % Descrition : Les figures de Chladni sont une représentation visuelle des 
 % modes de vibration naturels d'une plaque sous différentes excitations.
 % Si la fréquence se trouve à une fréquence naturelle, les amplitudes 
-% de mouvement seront plus élevées et des noeuds seront crée. 
+% de mouvement seront plus élevées et des noeuds seront créés. 
 % Ce script peremt de détemriner les première fréquences naturelles et les 
 % figures qu'elles créent.
 
