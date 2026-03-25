@@ -1,4 +1,11 @@
 %% Auteur : CIP ; Date 27 mars 2026; Ttitre : Figure de Chladni (Devoir conjoint)
+% Descrition : Les figures de Chladni sont une représentation visuelle des 
+% modes de vibration naturels d'une plaque sous différentes excitations.
+% Si la fréquence se trouve à une fréquence naturelle, les amplitudes 
+% de mouvement seront plus élevées et des noeuds seront crée. 
+% Ce script peremt de détemriner les première fréquences naturelles et les 
+% figures qu'elles créent.
+
 
 %% Initialisation 
 
@@ -8,7 +15,7 @@ clc, clear , close all hidden
 
 L = 0.1; % longueur d'un côté de le membrane carré en m
 T = 200; % Tension linéique de la membrane en N/m
-rho = 0.296; % kg/m^2
+rho = 0.296; % Masse surfacique de la membrane kg/m^2
 P = 6; % Nombre de figures ou des plus petites fréquences
 N = 100; % Nombre de points par ligne
 
@@ -76,22 +83,22 @@ for i = 1:N
 
         k = (i-1)*N + j;
 
-        K(k,k) = -4*coeff;
+        K(k,k) = -4*coeff; % Création de la diagonale de nombre 4
 
         if i > 1
-            K(k-N,k) = coeff;
+            K(k-N,k) = coeff; % Création du voisin supérieur
         end
 
         if i < N
-            K(k+N,k) = coeff;
+            K(k+N,k) = coeff; % Création du voisin inférieur
         end
 
         if j > 1
-            K(k-1,k) = coeff;
+            K(k-1,k) = coeff; % Création du voisinde de gauche
         end
 
         if j < N
-            K(k+1,k) = coeff;
+            K(k+1,k) = coeff; % Création du voisin de droite
         end
     end
 end
@@ -116,8 +123,30 @@ V = V(:, idx); % Tri des vecteurs propres
 % Lambda = -w^2/c^2. Donc, w = sqrt(-lambda*c^2) et f_nat = w/2pi
 
 w_propres = sqrt(-lambda.*c.^2); % rad/s
+w_propres = sort(w_propres);
 f_propres = w_propres./(2*pi); %Hz
 
+
+%% Validation avec l'approche analytique
+% Solution analytique
+f_ana  = zeros(P,P);
+
+for m = 1:P
+    for n = 1:P
+        f_ana(m,n) = c/(2*L) * sqrt(m^2 + n^2);
+    end
+end 
+% Trier pour savoir les P premières fréquences
+f_ana_ligne = f_ana(:);
+f_ana_croissant = sort(f_ana_ligne);
+f_ana_P = f_ana_croissant(1:P);
+
+% Affichage des fréquences
+fprintf('Validation : Affichage des %d premières fréquences propres\n',P);
+fprintf('avec l''approche analytique de L''Annexe : ');
+for i = 1:P
+fprintf('Mode %-8d %-16.2f [Hz]\n',i,f_ana_P(i));
+end
 %% Étape B vi.
 
 % Pseudo-déclaration de l'aray x et y utiliser pour afficher les données (
@@ -214,9 +243,6 @@ for p = 1:P
 end
 
 sgtitle(sprintf('Figures de Chladni — contours [%.2f, %.2f]', tol_neg, tol_pos));
-
-
-
 
 
 
