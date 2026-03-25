@@ -223,8 +223,15 @@ for p = 1:P
     masque = (U_full > tol_neg) & (U_full < tol_pos);
 
     % Garder seulement les cellules du masque qui sont bordées
-    % par au moins un voisin blanc (0) — ce sont les contours
-    masque_erode = masque & ~imerode(masque, ones(3,3));
+    % Remplacement de imerode par une opération logique de voisinage
+    % On regarde si un pixel est dans le masque ET si un de ses voisins ne l'est pas
+    masque_voisins = masque(2:end-1, 2:end-1) & (...
+                     ~masque(1:end-2, 2:end-1) | ~masque(3:end, 2:end-1) | ...
+                     ~masque(2:end-1, 1:end-2) | ~masque(2:end-1, 3:end));
+    
+    % On remet aux bonnes dimensions (N+2 x N+2)
+    masque_erode = zeros(size(masque));
+    masque_erode(2:end-1, 2:end-1) = masque_voisins;
 
     subplot(nrows, ncols, p);
 
