@@ -143,7 +143,7 @@ f_ana_P = f_ana_croissant(1:P);
 
 % Affichage des fréquences
 fprintf('Validation : Affichage des %d premières fréquences propres\n',P);
-fprintf('avec l''approche analytique de L''Annexe : ');
+fprintf('avec l''approche analytique de L''Annexe :\n ');
 for i = 1:P
 fprintf('Mode %-8d %-16.2f [Hz]\n',i,f_ana_P(i));
 end
