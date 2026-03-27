@@ -18,7 +18,7 @@ r_bal  = 0.12;        % Rayon de la sphère / projectile (m)
 Cd_bal = 0.45;        % Coefficient de traînée du projectile sans parachute (-)
 
 % --- Conditions initiales ---
-y0_sim = 2.5;         % Hauteur initiale de lancement (m)
+y0_sim = 3.989;         % Hauteur initiale de lancement (m)
 
 % --- Environnement ---
 rho = 1.2041;         % Densité de l'air (kg/m³)
