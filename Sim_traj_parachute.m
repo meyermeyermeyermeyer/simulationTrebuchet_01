@@ -7,7 +7,7 @@ clc; clear; close all;
 
 % --- Cibles de trajectoire ---
 cible_Hmax = 8;       % Hauteur maximale à atteindre / plafond (m)
-cible_Dist = 20;      % Distance horizontale de la cible (m)
+cible_Dist = 25+2.1;      % Distance horizontale de la cible (m)
 
 % --- Point de départ de l'optimisation ---
 p0 = [15, 60];        % [v0_initiale (m/s), theta0_initiale (°)] — estimation initiale pour fminsearch
@@ -18,7 +18,7 @@ r_bal  = 0.12;        % Rayon de la sphère / projectile (m)
 Cd_bal = 0.45;        % Coefficient de traînée du projectile sans parachute (-)
 
 % --- Conditions initiales ---
-y0_sim = 3.989;         % Hauteur initiale de lancement (m)
+y0_sim = 3.9;         % Hauteur initiale de lancement (m)
 
 % --- Environnement ---
 rho = 1.2041;         % Densité de l'air (kg/m³)
@@ -35,7 +35,7 @@ dt = 0.005;           % Pas de temps de la simulation (s)
 Pa_m = 1.5;           % Masse totale capsule + parachute (kg)
 
 % --- Parachute déployé ---
-Pa_Cd       = 1.4;    % Coefficient de traînée du parachute déployé (-)
+Pa_Cd       = 1.38;    % Coefficient de traînée du parachute déployé (-)
 Pa_A        = 0.5;    % Surface projetée du parachute déployé (m²)
 Pa_CdAfull  = Pa_Cd * Pa_A;  % Produit Cd×A parachute déployé (m²)
 
