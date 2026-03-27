@@ -1,4 +1,12 @@
-%% Auteur : CIP ; Date 27 mars 2026; Ttitre : Figure de Chladni (Devoir conjoint)
+%% Titre : Figure de Chladni (Devoir conjoint)
+% Date 27 mars 2026
+% Auteurs : 
+% - KRAM2029, Markian Kravets
+% - LEBA7646, Anne-Clémence Leblanc
+% - MEYL3542, Léon Meyer 
+% - RANX5166, Xavier Rancourt
+% - ROYR4638, Raphael Royer 
+
 % Descrition : Les figures de Chladni sont une représentation visuelle des 
 % modes de vibration naturels d'une plaque sous différentes excitations.
 % Si la fréquence se trouve à une fréquence naturelle, les amplitudes 
@@ -8,39 +16,53 @@
 
 
 %% Initialisation 
-
 clc, clear , close all hidden
 
 %% Données
 
-L = 0.1; % longueur d'un côté de le membrane carré en m
-T = 200; % Tension linéique de la membrane en N/m
-rho = 0.296; % Masse surfacique de la membrane kg/m^2
-P = 6; % Nombre de figures ou des plus petites fréquences
-N = 100; % Nombre de points par ligne
-
+L = 0.1;      % Longueur d'un côté de le membrane carré [m]
+T = 200;      % Tension linéique de la membrane [N/m]
+rho = 0.296;  % Masse surfacique de la membrane [kg/m^2]
+P = 6;        % Nombre de figures ou des plus petites fréquences
+N = 100;      % Nombre de points par ligne
 
 
 %% Algorithme 
 
-% Données dépendante
+% Données dépendantes
 
-c = sqrt(T/rho); % vitesse de propagation des ondes dans la membrane
-h = L/(N+1); % pas 
+c = sqrt(T/rho); % Vitesse de propagation des ondes dans la membrane[m/s^2]
+h = L/(N+1);     % Pas 
 dof = N^2;
 
-%% Étape A i.
+%% Étape A i. L'équation d'onde 2D
 
 % Réécriture de l'équation d'onde avec comme solution u(x,y,t) =
-% u(x,y)*sin(wt)
-% L'équation d'onde est d2u(x,y,t)/dt2 = c^2*(d2u(x,y,t)/dx2 + d2u(x,y,t)/dy2)
-% En utilisant la solution fournis nous obtenons : 
-% -w^2 u(x,y) = c^2*(d2u(x,y,t)/dx2 + d2u(x,y,t)/dy2) avec comme condition
-% limite au déplacement : u = 0 pour les quatres bords de la membrane, donc
-% quand i = 1 ou N et quand j = 1 ou N. 
+% u(x,y)*sin(wt), représentant la hauteur du déplacement de la membrane 
+% en un point (x, y), mesurée à partir de sa position au repos
+
+% ici le d représente la dérivée partielle
+
+% u(x,y,t) = u(x,y)*sin(w*t);
+% du(x,y,z)/dt = u(x,y)*w*cos(w*t)
+% d2u(x,y,z)/dt2 = - w^2*u(x,y)*sin(w*t) (1)
+
+% L'équation d'onde est d2u(x,y,t)/dt2 = c^2(d2u(x,y,t)/dx2+d2u(x,y,t)/dy2)
+% On remplace par u(x,y,t) = u(x,y)*sin(w*t);
+% d2u(x,y,t)/dt2 = c^2(d2u(x,y)/dx2*sin(w*t)+d2u(x,y)/dy2*sin(w*t))
+% d2u(x,y,t)/dt2 = c^2(d2u(x,y)/dx2+d2u(x,y)/dy2)*sin(w*t) (2)
+
+% (1) = (2)
+% - w^2*u(x,y)*sin(w*t) = c^2(d2u(x,y)/dx2+d2u(x,y)/dy2)*sin(w*t)
+% Nous obtenons : - w^2*u(x,y) = c^2(d2u(x,y)/dx2+d2u(x,y)/dy2)
+
+% La condition limite au déplacement : 
+% déplacements transverses sur les 4 bords sont nuls, 
+% soit u = 0 pour les quatres bords de la membrane, 
+% donc quand i = 1 ou N et quand j = 1 ou N. 
+
 
 %% Étape A ii.
-
 
 % La méthode de différence sera seulement évalué avec la dérivation
 % numérique centré, car au bords de la membrane on sait déjà que u = 0. 
@@ -70,7 +92,6 @@ dof = N^2;
 % Pour ce déplacer dans la plaque 2D avec un array 1D, noous utilisons
 % comme incrémentation k = (i-1)*N + j où i sont les lignes et j les
 % colonnes. 
-
 
 
 K = spalloc(dof,dof,5*dof);
@@ -113,18 +134,18 @@ opts.maxit = 500;
  
 [V, D] = eigs(K, M, P, 'smallestabs', opts);
 
-lambda = diag(D); % Extraction des eigenvalues
+lambda = diag(D); % Extraction des eigenvalues, soit les valeurs propres
 
 [lambda, idx] = sort(lambda);  % Tri croissant
-V = V(:, idx); % Tri des vecteurs propres
+V = V(:, idx);  % Tri des vecteurs propres
 
 %% Étape B v.
 
 % Lambda = -w^2/c^2. Donc, w = sqrt(-lambda*c^2) et f_nat = w/2pi
 
-w_propres = sqrt(-lambda.*c.^2); % rad/s
+w_propres = sqrt(-lambda.*c.^2); % Fréquences angulaires propres [rad/s]
 w_propres = sort(w_propres);
-f_propres = w_propres./(2*pi); %Hz
+f_propres = w_propres./(2*pi); % Fréquences propres [Hz]
 
 
 %% Validation avec l'approche analytique
@@ -145,7 +166,7 @@ f_ana_P = f_ana_croissant(1:P);
 fprintf('Validation : Affichage des %d premières fréquences propres\n',P);
 fprintf('avec l''approche analytique de L''Annexe :\n ');
 for i = 1:P
-fprintf('Mode %-8d %-16.2f [Hz]\n',i,f_ana_P(i));
+fprintf('Mode %-8d %-16.2f [Hz]\n ',i,f_ana_P(i));
 end
 %% Étape B vi.
 
