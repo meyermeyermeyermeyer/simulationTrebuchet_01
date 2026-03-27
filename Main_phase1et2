@@ -27,13 +27,15 @@ lb2kg = 0.454;
 p.m      = 2.0;              % Masse projectile          [kg]
 p.M      = 250 * lb2kg;      % Masse contrepoids         [kg]
 p.mbeam  = 10.0;             % Masse du bras             [kg]
-p.l1     = 2.006;            % Bras côté projectile      [m]
-p.l2     = 0.508;             % Bras côté contrepoids     [m]
-p.l3     = 0.4572;            % Pendule contrepoids       [m]
-p.l4     = 0.998;            % Longueur fronde           [m]
+p.lp     = 0.991;            % Bras non ajustable côté projectile  [m]
+p.la     = 0.5;              % Bras ajustable co^té projectile     [m]
+p.l1     = p.lp + p.la;      % Bras total côté projectcile         [m]
+p.l2     = 0.559;            % Bras côté contrepoids     [m]
+p.l3     = 0.4572;           % Pendule contrepoids       [m]
+p.l4     = 0.998;            % Longueur de corde
 p.g      = 9.81;             % Gravité                   [m/s²]
 p.h_pivot = 2.1018;           % Hauteur du pivot          [m]
-
+p.h_rail = 0.20;           % % Hauteur du pivot          [m]
 p.Ibeam = 6.28;   % Inertie du bras [kg·m²]
 
 %% ─── Conditions Initiales ────────────────────────────────────────────────
@@ -59,7 +61,7 @@ end
 %   C_rail = l1·sin(θ₀) + l4·cos(ψ₀)
 %   Y_rail = h_pivot − C_rail   [hauteur absolue du rail au-dessus du sol]
 p.C_rail = p.l1*sin(th0) + p.l4*cos(ps0);
-p.Y_rail = p.h_pivot - p.C_rail;
+p.Y_rail =  p.h_rail - p.h_pivot;
 
 % Position X initiale du projectile (pour référence)
 x0_proj = -p.l1*cos(th0) + p.l4*sin(ps0);
