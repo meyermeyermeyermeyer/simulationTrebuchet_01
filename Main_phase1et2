@@ -23,24 +23,30 @@ clear; clc; close all;
 
 %% ─── Paramètres Physiques ───────────────────────────────────────────────
 lb2kg = 0.454;
+nb_trou = 14;
 
-p.m      = 2.0;              % Masse projectile          [kg]
-p.M      = 250 * lb2kg;      % Masse contrepoids         [kg]
-p.mbeam  = 10.0;             % Masse du bras             [kg]
+p.m      = 1.6;              % Masse projectile          [kg]
+p.M      = 128.80;      % Masse contrepoids         [kg]
+p.mbeam  = 14.0;             % Masse du bras             [kg]
 p.lp     = 0.991;            % Bras non ajustable côté projectile  [m]
-p.la     = 0.5;              % Bras ajustable co^té projectile     [m]
+p.la     = 0.0762 * nb_trou;              % Bras ajustable co^té projectile     [m]
 p.l1     = p.lp + p.la;      % Bras total côté projectcile         [m]
 p.l2     = 0.559;            % Bras côté contrepoids     [m]
 p.l3     = 0.4572;           % Pendule contrepoids       [m]
-p.l4     = 0.998;            % Longueur de corde
+p.l4     = 1.18;            % Longueur de corde
 p.g      = 9.81;             % Gravité                   [m/s²]
 p.h_pivot = 2.1018;           % Hauteur du pivot          [m]
 p.h_rail = 0.20;           % % Hauteur du pivot          [m]
 p.Ibeam = 6.28;   % Inertie du bras [kg·m²]
 
+
+
 %% ─── Conditions Initiales ────────────────────────────────────────────────
 th0  = deg2rad(60);   % Angle du bras          [rad]
-ps0  = deg2rad(80);   % Angle de la fronde     [rad]
+Adj = (p.h_pivot)-(p.h_rail)-(p.l1*sin(th0))
+Oppo = p.l4
+ps0 = acos(Adj/Oppo) % Angle de la fronde     [rad]
+%ps0 = deg2rad(80);
 ph0  = deg2rad(0);    % Angle du contrepoids   [rad]
 dth0 = 0;  dps0 = 0;  dph0 = 0;
 
@@ -79,11 +85,18 @@ fprintf('╚══════════════════════�
 %% ══════════════════════════════════════════════════════════════════════
 fprintf('► Phase 1 : Résolution avec contrainte rail...\n');
 
-opts_p1 = odeset('RelTol', 1e-7, 'AbsTol', 1e-9, ...
-                 'Events', @(t,y) rail_liftoff_event(t, y, p));
-
-[t1, y1, te1, ye1, ~] = ode45( ...
-    @(t,y) trebuchet_phase1(t, y, p), [0, 1], y0, opts_p1);
+% Vérification : si λ ≥ 0 dès le départ, le rail ne supporte pas
+% le projectile → on saute directement en Phase 2
+[~, lambda_init] = compute_lambda(y0, p);
+if lambda_init >= 0
+    warning('Force normale initiale ≤ 0 (λ=%.4f) — Phase 1 ignorée.', lambda_init);
+    t1 = 0; y1 = y0'; te1 = 0; ye1 = y0';
+else
+    opts_p1 = odeset('RelTol', 1e-7, 'AbsTol', 1e-9, ...
+                     'Events', @(t,y) rail_liftoff_event(t, y, p));
+    [t1, y1, te1, ye1, ~] = ode45( ...
+        @(t,y) trebuchet_phase1(t, y, p), [0, 1], y0, opts_p1);
+end
 
 %% ══════════════════════════════════════════════════════════════════════
 %%  PHASE 2 — Trébuchet Libre (Système Non-Contraint)
