@@ -1,0 +1,216 @@
+%% OPTIMISATION DU TEMPS DE DÉPLOIEMENT DU PARACHUTE
+clc; clear; close all;
+
+%% =====================================================================
+%% DONNÉES UTILISATEUR
+%% =====================================================================
+
+v0_final     = 24.24;
+theta0_final = 34.01;
+
+Pa_t_delay = 0.3;   % délai avant que le parachute soit gonflé
+
+cible_Dist = 26;
+
+t_para_0 = 1.0;
+
+m      = 1.2;
+r_bal  = 0.12;
+Cd_bal = 0.45;
+
+y0_sim = 3.691;
+
+rho = 1.2041;
+g   = 9.81;
+
+dt = 0.005;
+
+%% =====================================================================
+%% PARACHUTE
+%% =====================================================================
+
+Pa_m = 1.6;
+
+Pa_Cd      = 1.38;
+Pa_A       = pi*0.4^2;
+Pa_CdAfull = Pa_Cd * Pa_A;
+
+Pa_Cd0  = 0.5;
+Pa_A0   = 0.01;
+Pa_CdA0 = Pa_Cd0 * Pa_A0;
+
+Pa_tau      = 0.4;
+Pa_tauAlign = 0.25;
+
+%% =====================================================================
+%% OPTIMISATION
+%% =====================================================================
+
+options = optimset('Display', 'none', 'TolX', 1e-6);
+
+[t_para_opt, ~] = fminsearch(@(t_p) fonction_cout_tpara( ...
+    t_p, v0_final, theta0_final, cible_Dist, ...
+    m, r_bal, Cd_bal, Pa_tau, Pa_tauAlign, ...
+    Pa_CdA0, Pa_CdAfull, Pa_m, ...
+    y0_sim, rho, g, dt), t_para_0, options);
+
+Pa_t_dep = t_para_opt;
+
+% ✅ Calcul du déclenchement AVANT
+Pa_t_trigger = Pa_t_dep - Pa_t_delay;
+
+fprintf('Temps déclenchement : %.4f s\n', Pa_t_trigger);
+fprintf('Temps déploiement   : %.4f s\n', Pa_t_dep);
+
+%% =====================================================================
+%% SIMULATION
+%% =====================================================================
+
+[H, D, X, Y, T_sim, V_mag, A_mag, idx_para] = sim_physique_complete( ...
+    v0_final, theta0_final, ...
+    m, r_bal, Cd_bal, Pa_t_dep, ...
+    Pa_tau, Pa_tauAlign, ...
+    Pa_CdA0, Pa_CdAfull, Pa_m, ...
+    y0_sim, rho, g, dt);
+
+% 🔴 index déclenchement
+idx_trigger = find(T_sim >= Pa_t_trigger, 1, 'first');
+
+%% =====================================================================
+%% AFFICHAGE
+%% =====================================================================
+
+fprintf('\n========================================================\n');
+fprintf('Temps déclenchement (signal) : %.4f s\n', Pa_t_trigger);
+fprintf('Délai parachute              : %.4f s\n', Pa_t_delay);
+fprintf('Déploiement effectif         : %.4f s\n', Pa_t_dep);
+fprintf('Distance finale              : %.2f m\n', D);
+fprintf('Erreur                       : %.4f m\n', abs(D-cible_Dist));
+
+%% =====================================================================
+%% FIGURE : TRAJECTOIRE ANIMÉE
+%% =====================================================================
+
+fig = figure('Name','Trajectoire Parachute', ...
+             'NumberTitle','off', ...
+             'Color','w', ...
+             'Position',[200 100 900 600]);
+
+clf(fig);
+axis equal
+hold on; grid on;
+xlabel('Distance X (m)');
+ylabel('Hauteur Y (m)');
+title('Trajectoire avec délai de déclenchement');
+
+axis([0 max(X)+0.5 0 max(Y)+1]);
+
+hTraj  = plot(NaN, NaN, 'b', 'LineWidth', 2);
+hPoint = plot(NaN, NaN, 'ko', 'MarkerFaceColor', 'r');
+
+for i = 1:8:length(X)
+
+    set(hTraj,  'XData', X(1:i), 'YData', Y(1:i));
+    set(hPoint, 'XData', X(i),   'YData', Y(i));
+
+    % 🔴 déclenchement
+    if i >= idx_trigger && idx_trigger > 0
+        plot(X(idx_trigger), Y(idx_trigger), 'ro', ...
+            'MarkerSize', 8, 'LineWidth', 2);
+        text(X(idx_trigger), Y(idx_trigger)+0.5, ...
+            'Déclenchement', 'Color', 'r', 'FontWeight', 'bold');
+    end
+
+    % 🪂 déploiement
+    if i >= idx_para && idx_para > 0
+        plot(X(idx_para), Y(idx_para), 'rx', ...
+            'MarkerSize', 10, 'LineWidth', 2);
+        text(X(idx_para), Y(idx_para)+0.5, ...
+            '🪂 Déploiement', 'Color', [0.8 0.2 0], 'FontWeight', 'bold');
+    end
+
+    pause(0.01);
+    drawnow;
+end
+
+%% =====================================================================
+%% FONCTIONS
+%% =====================================================================
+
+function score = fonction_cout_tpara(t_p, v0, theta0, d_target, ...
+    m, r_bal, Cd_bal, Pa_tau, Pa_tauAlign, ...
+    Pa_CdA0, Pa_CdAfull, Pa_m, ...
+    y0, rho, g, dt)
+
+    if t_p <= 0 || t_p > 10
+        score = 1e6;
+        return;
+    end
+
+    [~, d_sim] = sim_physique_complete(v0, theta0, ...
+        m, r_bal, Cd_bal, t_p, ...
+        Pa_tau, Pa_tauAlign, ...
+        Pa_CdA0, Pa_CdAfull, Pa_m, ...
+        y0, rho, g, dt);
+
+    score = (d_sim - d_target)^2;
+end
+
+function [y_max, x_final, X, Y, T, V_mag, A_mag, idx_para] = sim_physique_complete( ...
+    v0, theta0_deg, m, r_bal, Cd_bal, t_para, ...
+    Pa_tau, Pa_tauAlign, Pa_CdA0, Pa_CdAfull, Pa_m, ...
+    y0, rho, g, dt)
+
+    k_bal = 0.5 * rho * Cd_bal * (pi * r_bal^2) / m;
+
+    vx = v0 * cosd(theta0_deg);
+    vy = v0 * sind(theta0_deg);
+
+    x = 0; y = y0; t = 0;
+
+    X = x; Y = y; T = t;
+    V_mag = sqrt(vx^2+vy^2);
+    A_mag = g;
+
+    y_max = y;
+    idx_para = 0;
+
+    while y >= 0
+
+        if t < t_para
+            v  = sqrt(vx^2 + vy^2);
+            ax = -k_bal * v * vx;
+            ay = -k_bal * v * vy - g;
+        else
+            if idx_para == 0
+                idx_para = length(X);
+            end
+
+            t_dep_loc = t - t_para;
+            CdA_eff = Pa_CdAfull * (1 - exp(-t_dep_loc / Pa_tau));
+
+            Fdy = -0.5 * rho * CdA_eff * abs(vy) * vy;
+
+            ax = -vx / Pa_tauAlign;
+            ay = Fdy / Pa_m - g;
+        end
+
+        vx = vx + ax*dt;
+        vy = vy + ay*dt;
+        x  = x  + vx*dt;
+        y  = y  + vy*dt;
+        t  = t  + dt;
+
+        X(end+1)=x;
+        Y(end+1)=y;
+        T(end+1)=t;
+        V_mag(end+1)=sqrt(vx^2+vy^2);
+        A_mag(end+1)=sqrt(ax^2+ay^2);
+
+        if y > y_max
+            y_max = y;
+        end
+    end
+
+    x_final = x;
+end
