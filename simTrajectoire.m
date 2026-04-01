@@ -14,8 +14,8 @@ Surf = pi*R^2; % Surface de contact du ballon [m^2]
 
 % Données de la simulation
 g = 9.81;
-v0 = 30;                      % vitesse initiale
-theta0 = 50 * pi/180;         % angle en radians
+v0 = 14;                      % vitesse initiale
+theta0 = 0 * pi/180;         % angle en radians
 dt = 0.01;                    % pas de temps
 %% Algorithme
 % Calcul du coefficient de trainé et du drag
