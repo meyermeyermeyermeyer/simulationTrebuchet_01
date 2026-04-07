@@ -15,15 +15,19 @@ angle_cible_rad = deg2rad(angle_cible_deg);
 
 % --- 2. PARAMÈTRES FIXES ---
 lb2kg = 0.454;
+nb_trou = 14;
 
-p.m      = 2.0;
-p.mbeam  = 10.0;
-p.l1     = 0.991;
-p.l2     = 0.559;
-p.l3     = 0.4572;
-p.g      = 9.81;
-p.h_pivot = 2.1018;
-p.Ibeam  = 6.28;
+
+p.m      = 1.6;              % Masse projectile          [kg]
+p.mbeam  = 14.0;             % Masse du bras             [kg]
+p.lp     = 0.991;            % Bras non ajustable côté projectile  [m]
+p.la     = 0.0762 * nb_trou;              % Bras ajustable co^té projectile     [m]
+p.l1     = p.lp + p.la;      % Bras total côté projectcile         [m]
+p.l2     = 0.559;            % Bras côté contrepoids     [m]
+p.l3     = 0.4572;           % Pendule contrepoids       [m]
+p.g      = 9.81;             % Gravité                   [m/s²]
+p.h_pivot = 2.1018;           % Hauteur du pivot          [m]
+p.Ibeam = 6.28;   % Inertie du bras [kg·m²]
 
 % Conditions initiales (constantes durant l'optimisation)
 y0 = [deg2rad(60); deg2rad(80); deg2rad(0); 0; 0; 0];
