@@ -1,4 +1,4 @@
-%% OPTIMISATION DU TEMPS DE DÉPLOIEMENT DU PARACHUTE — MODÈLE PRÉCIS
+ %% OPTIMISATION DU TEMPS DE DÉPLOIEMENT DU PARACHUTE — MODÈLE PRÉCIS
 clc; clear; close all;
 
 %% =====================================================================
@@ -6,22 +6,22 @@ clc; clear; close all;
 %% =====================================================================
 
 % --- Conditions initiales (angle et vitesse connus) ---
-v0_final     = 20;   % Vitesse initiale (m/s)
-theta0_final = 30;   % Angle initial (°)
+v0_final     = 22.13;   % Vitesse initiale (m/s)
+theta0_final = 20;   % Angle initial (°)
 
 % --- Délai mécanique entre déclenchement et déploiement effectif ---
-Pa_t_delay = 0.3;       % Délai avant que le parachute soit gonflé (s)
+Pa_t_delay = 0.9;       % Délai avant que le parachute soit gonflé (s)
 
 % --- Cible ---
-cible_Dist = 26;        % Distance horizontale cible (m)
+cible_Dist = 28;        % Distance horizontale cible (m)
 
 % --- Point de départ de l'optimisation ---
 t_para_0 = 1.0;         % Estimation initiale du temps de déploiement (s)
 
 % --- Propriétés physiques du projectile ---
-m      = 1.2;           % Masse du projectile (kg)
+m      = 1.4;           % Masse du projectile (kg)
 r_bal  = 0.12;          % Rayon de la sphère (m)
-Cd_bal = 0.45;          % Coefficient de traînée balistique (-)
+Cd_bal = 0.25;          % Coefficient de traînée balistique (-)
 
 % --- Condition initiale ---
 y0_sim = 3.691;         % Hauteur initiale de lancement (m)
@@ -46,7 +46,7 @@ Pa_A       = pi * 0.4^2;
 Pa_CdAfull = Pa_Cd * Pa_A;  % CdA parachute déployé (m²)
 
 % --- Capsule seule (traînée résiduelle avant gonflage complet) ---
-Pa_Cd0  = 0.5;
+Pa_Cd0  = 0.9;
 Pa_A0   = 0.01;
 Pa_CdA0 = Pa_Cd0 * Pa_A0;  % CdA capsule seule (m²)
 
