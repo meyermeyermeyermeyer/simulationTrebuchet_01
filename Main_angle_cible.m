@@ -23,26 +23,26 @@ clear; clc; close all;
 
 %% ─── Paramètres Physiques ───────────────────────────────────────────────
 lb2kg = 0.454;
-nb_trou = 14;
+nb_trou = 13;
 
-p.m      = 1.6;              % Masse projectile          [kg]
-p.M      = 128.80;      % Masse contrepoids         [kg]
+p.m      = 1.4;              % Masse projectile          [kg]
+p.M      = 104.54;      % Masse contrepoids         [kg]
 p.mbeam  = 14.0;             % Masse du bras             [kg]
 p.lp     = 0.991;            % Bras non ajustable côté projectile  [m]
 p.la     = 0.0762 * nb_trou;              % Bras ajustable co^té projectile     [m]
 p.l1     = p.lp + p.la;      % Bras total côté projectcile         [m]
 p.l2     = 0.559;            % Bras côté contrepoids     [m]
 p.l3     = 0.4572;           % Pendule contrepoids       [m]
-p.l4     = 1.18;            % Longueur de corde
+p.l4     = 1.2;            % Longueur de corde
 p.g      = 9.81;             % Gravité                   [m/s²]
 p.h_pivot = 2.1018;           % Hauteur du pivot          [m]
 p.h_rail = 0.20;           % % Hauteur du pivot          [m]
-p.Ibeam = 6.28;   % Inertie du bras [kg·m²]
+p.Ibeam = 12;   % Inertie du bras [kg·m²]
 
 %% ─── *** ANGLE DE SORTIE CIBLE *** ──────────────────────────────────────
 % Angle que doit faire la vitesse de la capsule avec l'horizontale au lâcher [°]
 % Modifiez cette valeur pour cibler un angle de lancement différent.
-angle_sortie_cible = 0;   % [degrés]
+angle_sortie_cible = 25;   % [degrés]
 
 %% ─── Conditions Initiales ────────────────────────────────────────────────
 th0  = deg2rad(60);   % Angle du bras          [rad]
@@ -399,3 +399,109 @@ function [Mmat, F] = masse_et_force(th, ps, ph, dth, dps, dph, p)
 
     F = [F1; F2; F3];
 end
+
+%% ─── Accélérations Tangentielle et Centripète de la Capsule ─────────
+a_tang = zeros(N_pts, 1);
+a_cent = zeros(N_pts, 1);
+a_tot  = zeros(N_pts, 1);
+
+for i = 1:N_pts
+    th_i  = y(i,1);  ps_i  = y(i,2);  ph_i  = y(i,3);
+    dth_i = y(i,4);  dps_i = y(i,5);  dph_i = y(i,6);
+
+    % ── Accélérations généralisées (réutilise le même système que la tension) ──
+    [Mmat, F] = masse_et_force(th_i, ps_i, ph_i, dth_i, dps_i, dph_i, p);
+
+    if i <= n_p1          % Phase 1 : système KKT avec contrainte rail
+        J     = [p.l1*cos(th_i), -p.l4*sin(ps_i), 0];
+        gamma = p.l1*sin(th_i)*dth_i^2 + p.l4*cos(ps_i)*dps_i^2;
+        sol   = [Mmat, -J'; J, 0] \ [F; gamma];
+        accel = sol(1:3);
+    else                  % Phase 2 : dynamique libre
+        accel = Mmat \ F;
+    end
+
+    ddth_i = accel(1);
+    ddps_i = accel(2);
+
+    % ── Vitesse cartésienne de la capsule ──────────────────────────────
+    vx_i =  p.l1*sin(th_i)*dth_i + p.l4*cos(ps_i)*dps_i;
+    vy_i = -p.l1*cos(th_i)*dth_i + p.l4*sin(ps_i)*dps_i;
+    v_i  = sqrt(vx_i^2 + vy_i^2);
+
+    % ── Accélération cartésienne de la capsule  (d/dt des vitesses) ───
+    %   d(vx)/dt = l1·cos(θ)·θ̇² + l1·sin(θ)·θ̈  − l4·sin(ψ)·ψ̇² + l4·cos(ψ)·ψ̈
+    %   d(vy)/dt = l1·sin(θ)·θ̇² − l1·cos(θ)·θ̈  + l4·cos(ψ)·ψ̇² + l4·sin(ψ)·ψ̈
+    ax_i =  p.l1*cos(th_i)*dth_i^2 + p.l1*sin(th_i)*ddth_i ...
+           - p.l4*sin(ps_i)*dps_i^2 + p.l4*cos(ps_i)*ddps_i;
+    ay_i =  p.l1*sin(th_i)*dth_i^2 - p.l1*cos(th_i)*ddth_i ...
+           + p.l4*cos(ps_i)*dps_i^2 + p.l4*sin(ps_i)*ddps_i;
+
+    a_tot(i) = sqrt(ax_i^2 + ay_i^2);
+
+    if v_i > 1e-6
+        % Tangentielle  : projection de a sur v̂  (signée : + si accélération, − si freinage)
+        a_tang(i) = (ax_i*vx_i + ay_i*vy_i) / v_i;
+
+        % Centripète    : norme de la composante perpendiculaire à v̂  (toujours ≥ 0)
+        %                 = |a × v̂|  (produit vectoriel 2-D, scalaire)
+        a_cent(i) = abs(ay_i*vx_i - ax_i*vy_i) / v_i;
+    else
+        a_tang(i) = 0;
+        a_cent(i) = 0;
+    end
+end
+
+% ── Affichage console ──────────────────────────────────────────────────
+fprintf('\n════════════════════════════════════\n');
+fprintf('   ACCÉLÉRATIONS DE LA CAPSULE      \n');
+fprintf('════════════════════════════════════\n');
+fprintf('Accél. tangentielle max  : %7.2f m/s²\n', max( a_tang));
+fprintf('Accél. tangentielle min  : %7.2f m/s²\n', min( a_tang));
+fprintf('Accél. centripète max    : %7.2f m/s²\n', max( a_cent));
+fprintf('Accél. totale max        : %7.2f m/s²\n', max( a_tot ));
+fprintf('────────────────────────────────────\n');
+fprintf('Au point de lâcher :\n');
+fprintf('  Tangentielle  = %7.2f m/s²\n', a_tang(idx));
+fprintf('  Centripète    = %7.2f m/s²\n', a_cent(idx));
+fprintf('  Totale        = %7.2f m/s²\n', a_tot( idx));
+fprintf('════════════════════════════════════\n\n');
+
+% ── Figure ────────────────────────────────────────────────────────────
+figure('Color', 'w', 'Name', 'Accélérations de la Capsule');
+
+subplot(3,1,1);
+plot(t, a_tang, 'LineWidth', 2, 'Color', [0.2 0.5 0.8]); hold on;
+plot(t(idx), a_tang(idx), 'ro', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'r');
+yline(0, 'k--', 'LineWidth', 1);
+if isfinite(p.t_transition)
+    xline(p.t_transition, 'b--', 'LineWidth', 1.5, 'Label', 'Décollage rail');
+end
+xlabel('Temps [s]');  ylabel('a_{tang} [m/s²]');
+title(sprintf('Accélération tangentielle  (%.2f m/s² au lâcher)', a_tang(idx)));
+legend('a_{tang}', 'Lâcher', 'Location', 'best');
+grid on;
+
+subplot(3,1,2);
+plot(t, a_cent, 'LineWidth', 2, 'Color', [0.85 0.33 0.10]); hold on;
+plot(t(idx), a_cent(idx), 'ro', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'r');
+if isfinite(p.t_transition)
+    xline(p.t_transition, 'b--', 'LineWidth', 1.5, 'Label', 'Décollage rail');
+end
+xlabel('Temps [s]');  ylabel('a_{cent} [m/s²]');
+title(sprintf('Accélération centripète  (%.2f m/s² au lâcher)', a_cent(idx)));
+legend('a_{cent}', 'Lâcher', 'Location', 'best');
+grid on;
+
+subplot(3,1,3);
+plot(t, a_tot, 'LineWidth', 2, 'Color', [0.49 0.18 0.56]); hold on;
+plot(t(idx), a_tot(idx), 'ro', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'r');
+if isfinite(p.t_transition)
+    xline(p.t_transition, 'b--', 'LineWidth', 1.5, 'Label', 'Décollage rail');
+end
+xlabel('Temps [s]');  ylabel('a_{tot} [m/s²]');
+title(sprintf('Accélération totale  ||a||  (%.2f m/s² au lâcher)', a_tot(idx)));
+legend('a_{tot}', 'Lâcher', 'Location', 'best');
+grid on;
+
+sgtitle('Accélérations de la Capsule au cours du Lancement', 'FontSize', 13, 'FontWeight', 'bold');
